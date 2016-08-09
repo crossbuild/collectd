@@ -131,15 +131,8 @@ static derive_t vserver_get_sock_bytes(const char *s)
 
 static int vserver_read (void)
 {
-#if NAME_MAX < 1024
-# define DIRENT_BUFFER_SIZE (sizeof (struct dirent) + 1024 + 1)
-#else
-# define DIRENT_BUFFER_SIZE (sizeof (struct dirent) + NAME_MAX + 1)
-#endif
-
 	DIR 			*proc;
 	struct dirent 	*dent; /* 42 */
-	char dirent_buffer[DIRENT_BUFFER_SIZE];
 
 	errno = 0;
 	proc = opendir (PROCDIR);
@@ -164,19 +157,22 @@ static int vserver_read (void)
 
 		int status;
 
-		status = readdir_r (proc, (struct dirent *) dirent_buffer, &dent);
-		if (status != 0)
-		{
-			char errbuf[4096];
-			ERROR ("vserver plugin: readdir_r failed: %s",
-					sstrerror (errno, errbuf, sizeof (errbuf)));
-			closedir (proc);
-			return (-1);
-		}
-		else if (dent == NULL)
-		{
-			/* end of directory */
-			break;
+		errno = 0;
+		dent = readdir (proc);
+		if (dent == NULL) {
+			if (errno != 0)
+			{
+				char errbuf[4096];
+				ERROR ("vserver plugin: readdir failed: %s",
+						sstrerror (errno, errbuf, sizeof (errbuf)));
+				closedir (proc);
+				return (-1);
+			}
+			else
+			{
+				/* end of directory */
+				break;
+			}
 		}
 
 		if (dent->d_name[0] == '.')
